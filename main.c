@@ -67,81 +67,141 @@ int md_to_inline(const char *str, char *out_buf, size_t size_outbuf,
   const char *p = str;
 
   while (*p) {
-    if (*p == '*') {
-      if (*(p + 1) == '*') { // **bold**
-        if (*(p + 2) == '*') {
-          const char *start = p + 3;
-          char *end = strstr(start, "***");
-          if (end != NULL && *start != ' ' && *(end - 1) != ' ') {
-            curr_state = STATE_BOLD_ITALIC;
-            memcpy(pOut, "<b><em>", 7);
-            pOut += 7;
-            while (start < end) {
-              *pOut++ = *start++;
-            }
-            memcpy(pOut, "</em></b>", 9);
-            pOut += 9;
-            curr_state = STATE_NONE;
-            p = end + 3;
-            continue;
+    if (*p == '*' && *(p + 1) == '*' && *(p + 2) == '*') {
+      const char *start = p + 3;
+      char *end = strstr(start, "***");
+
+      if (end != NULL && *start != ' ' && *(end - 1) != ' ') {
+        curr_state = STATE_BOLD_ITALIC;
+        size_t space_used = pOut - out_buf;
+        size_t remain = size_outbuf - space_used;
+
+        if (remain >=
+            (strlen("<b><em>") + strlen("</em></b>") + (end - start) + 1)) {
+          memcpy(pOut, "<b><em>", strlen("<b><em>"));
+          pOut += 7;
+
+          while (start < end) {
+            *pOut++ = *start++;
           }
+
+          memcpy(pOut, "</em></b>", strlen("</em></b>"));
+          pOut += 9;
+
+          curr_state = STATE_NONE;
+          p = end + 3;
+          continue;
         } else {
-          const char *start = p + 2; // bold
-          char *end = strstr(start, "**");
-          if (end != NULL && *start != ' ' && *(end - 1) != ' ') {
-            curr_state = STATE_BOLD;
-            memcpy(pOut, "<b>", 3);
-            pOut += 3;
-            while (start < end)
-              *pOut++ = *start++;
-            memcpy(pOut, "</b>", 4);
-            pOut += 4;
-            curr_state = STATE_NONE;
-            p = end + 2;
-            continue;
-          }
+          fprintf(stderr, "Return buffer is smaller that size of string "
+                          "conversion to html\n");
+          return -1;
         }
-      } else { // *italic*
-        const char *start = p + 1;
-        char *end = strstr(start, "*");
-        if (end != NULL && *start != ' ' && *(end - 1) != ' ') {
-          curr_state = STATE_ITALIC;
+      }
+    } else if (*p == '*' && *(p + 1) == '*') {
+      const char *start = p + 2; // bold
+      char *end = strstr(start, "**");
+
+      if (end != NULL && *start != ' ' && *(end - 1) != ' ') {
+        curr_state = STATE_BOLD;
+        size_t space_used = pOut - out_buf;
+        size_t remain = size_outbuf - space_used;
+
+        if (remain >= (strlen("<b>") + strlen("</b>") + (end - start) + 1)) {
+          memcpy(pOut, "<b>", 3);
+          pOut += 3;
+
+          while (start < end) {
+            *pOut++ = *start++;
+          }
+
+          memcpy(pOut, "</b>", 4);
+          pOut += 4;
+
+          curr_state = STATE_NONE;
+          p = end + 2;
+          continue;
+        } else {
+          fprintf(stderr, "Return buffer is smaller that size of string "
+                          "conversion to html\n");
+          return -1;
+        }
+      }
+    } else if (*p == '*') { // *italic*
+      const char *start = p + 1;
+      char *end = strstr(start, "*");
+
+      if (end != NULL && *start != ' ' && *(end - 1) != ' ') {
+        curr_state = STATE_ITALIC;
+        size_t space_used = pOut - out_buf;
+        size_t remain = size_outbuf - space_used;
+
+        if (remain >= (strlen("<em>") + strlen("</em>") + (end - start) + 1)) {
           memcpy(pOut, "<em>", 4);
           pOut += 4;
+
           while (start != end) {
             *pOut++ = *start++;
           }
+
           memcpy(pOut, "</em>", 5);
           pOut += 5;
+
           curr_state = STATE_NONE;
           p = end + 1;
           continue;
         }
+
+        fprintf(stderr, "Return buffer is smaller that size of string "
+                        "conversion to html\n");
+        return -1;
       }
     } else if (*p == '`') {
       const char *start = p + 1;
       char *end = strstr(start, "`");
+
       if (end != NULL && *start != ' ' && *(end - 1) != ' ') {
         curr_state = STATE_CODE;
-        memcpy(pOut, "<code>", 6);
-        pOut += 6;
-        while (start != end) {
-          *pOut++ = *start++;
+        size_t space_used = pOut - out_buf;
+        size_t remain = size_outbuf - space_used;
+
+        if (remain >=
+            (strlen("<code>") + strlen("</code>") + (end - start) + 1)) {
+          memcpy(pOut, "<code>", 6);
+          pOut += 6;
+
+          while (start != end) {
+            *pOut++ = *start++;
+          }
+
+          memcpy(pOut, "</code>", 7);
+          pOut += 7;
+
+          curr_state = STATE_NONE;
+          p = end + 1;
+          continue;
+        } else {
+          fprintf(stderr, "Return buffer is smaller that size of string "
+                          "conversion to html\n");
+          return -1;
         }
-        memcpy(pOut, "</code>", 7);
-        pOut += 7;
-        curr_state = STATE_NONE;
-        p = end + 1;
-        continue;
       }
     }
-    *pOut++ = *p++; // write normal character
+    size_t space_used = pOut - out_buf;
+    size_t remain = size_outbuf - space_used;
+    if (remain >= 2) { // one for char and one for null terminator
+      *pOut++ = *p++;  // write normal character
+    } else {
+      fprintf(stderr, "Space full in out buffer returning ......\n");
+      return -1;
+    }
   }
 
   *pOut = '\0';
+
   if (ret_outsize) {
     *ret_outsize = pOut - out_buf;
   }
+
   return (int)(pOut - out_buf);
 }
 int md_to_para(char *str, char *out_buf, size_t size_outbuf,
@@ -194,6 +254,19 @@ int md_to_unordered_list(char *str, char *out_buf, size_t size_outbuf,
   }
   memcpy(pOut, "  <li>", 6);
   pOut += 6;
+  if (ptr[0] == '[' && (ptr[1] == ' ' || ptr[1] == 'x' || ptr[1] == 'X') &&
+      ptr[2] == ']' && ptr[3] == ' ') {
+    if (ptr[1] == ' ') {
+      // Unchecked box
+      memcpy(pOut, "<input type=\"checkbox\"> ", 24);
+      pOut += 33;
+    } else {
+      // Checked box
+      memcpy(pOut, "<input type=\"checkbox\" checked > ", 32);
+      pOut += 41;
+    }
+    ptr += 4; // skip [ ] [X]
+  }
   size_t remaining = size_outbuf - (size_t)(pOut - out_buf);
   md_to_inline(ptr, pOut, remaining,
                &ret_size); // move past opening ul and li tag
@@ -285,12 +358,20 @@ int main(int argc, char *argv[]) {
     }
     if (*pCurr == '-' && *(pCurr + 1) == ' ') {
       pCurr += 2;
+      if (is_ordList) {
+        fputs("</ol>", fout);
+        is_ordList = false;
+      }
       md_to_unordered_list(pCurr, write, sizeof(write), &fmatStrSize, &is_list);
       fwrite(write, fmatStrSize, 1, fout);
       fputc('\n', fout);
       fwrite(write, fmatStrSize, 1, stdout);
     } else if (isdigit(*pCurr) && *(pCurr + 1) == ' ') {
       pCurr += 2;
+      if (is_list) {
+        fputs("</ul>", fout);
+        is_list = false;
+      }
       md_to_ordered_list(pCurr, write, sizeof(write), &fmatStrSize,
                          &is_ordList);
       fwrite(write, fmatStrSize, 1, fout);
@@ -325,11 +406,11 @@ int main(int argc, char *argv[]) {
     }
   }
   if (is_list) { // handling last line of file list
-    fwrite("</ul>", 1, 6, fout);
+    fputs("</ul>", fout);
     is_list = false;
   }
   if (is_ordList) {
-    fwrite("</ol>", 1, 6, fout);
+    fputs("</ol>", fout);
     is_ordList = false;
   }
   write_html_footer(fout);
