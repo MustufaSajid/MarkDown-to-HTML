@@ -1,7 +1,10 @@
 /*
  * PROGRAM : markdown-to-html Converter
  * FILE: main.c
+ * Target : Windows (Mingw-w64 GCC )
  * DESCRIPTION: Parses markdown file and generates a clean html
+ * DEPENDENCIES :
+ *  func.h / func.c Contain function Prototype and Implementation
  * USGAE:
  *      ./mdtohtml <md file> <output html filename> <title> < --css >
  *      <title> : is optional argument
@@ -31,7 +34,7 @@ int main(int argc, char *argv[]) {
     fprintf(stderr, "Error opening html file ");
     return EXIT_FAILURE;
   }
-  char *title = "Document";
+  char *title = "Document"; // default if not title arg provided
   bool css = false;
   for (int i = 3; i < argc; i++) {
     if (strcmp(argv[i], "--css") == 0) {
