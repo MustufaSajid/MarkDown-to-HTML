@@ -1,0 +1,6 @@
+BasedOnStyle: Linux
+UseTab: Always
+IndentWidth: 4
+TabWidth: 4
+ColumnLimit: 200
+AlignAfterOpenBracket: Align
