@@ -16,6 +16,9 @@
   "\tcode { background: #f4f4f4; padding: 2px 6px; border-radius: 4px; "       \
   "font-family: monospace; }\n"
 
+static const char *CB_UNCHECKED = "<input type=\"checkbox\"> ";
+static const char *CB_CHECKED = "<input type=\"checkbox\" checked> ";
+
 typedef enum {
   STATE_TEXT,
   STATE_ITALIC,

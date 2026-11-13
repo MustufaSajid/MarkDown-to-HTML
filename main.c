@@ -74,23 +74,35 @@ int main(int argc, char *argv[]) {
     if (*pCurr == '-' && *(pCurr + 1) == ' ') {
       pCurr += 2;
       if (is_ordList) {
-        fputs("</ol>", fout);
+        fputs("</ol>\n", fout);
         is_ordList = false;
       }
-      md_to_unordered_list(pCurr, write, sizeof(write), &fmatStrSize, &is_list);
+      if (md_to_unordered_list(pCurr, write, sizeof(write), &fmatStrSize,
+                               &is_list) != 0) {
+        fclose(file);
+        fclose(fout);
+        return EXIT_FAILURE;
+      }
       fwrite(write, fmatStrSize, 1, fout);
-      fputc('\n', fout);
       fwrite(write, fmatStrSize, 1, stdout);
     } else if (isdigit(*pCurr) && *(pCurr + 1) == ' ') {
-      pCurr += 2;
+      char *q = pCurr;
+      while (isdigit((unsigned char)*q))
+        q++;
+      if (*q == '.' && *(q + 1) == ' ') {
+        pCurr = q + 2;
+      }
       if (is_list) {
-        fputs("</ul>", fout);
+        fputs("</ul>\n", fout);
         is_list = false;
       }
-      md_to_ordered_list(pCurr, write, sizeof(write), &fmatStrSize,
-                         &is_ordList);
+      if (md_to_ordered_list(pCurr, write, sizeof(write), &fmatStrSize,
+                             &is_ordList) != 0) {
+        fclose(file);
+        fclose(fout);
+        return EXIT_FAILURE;
+      }
       fwrite(write, fmatStrSize, 1, fout);
-      fputc('\n', fout);
       fwrite(write, fmatStrSize, 1, stdout);
     } else {
       if (is_list) {
@@ -105,8 +117,12 @@ int main(int argc, char *argv[]) {
         continue;
       }
       if (state_heading) {
-        md_heading_to_html(pCurr, hash_count, write, sizeof(write),
-                           &fmatStrSize);
+        if (md_heading_to_html(pCurr, hash_count, write, sizeof(write),
+                               &fmatStrSize) != 0) {
+          fclose(file);
+          fclose(fout);
+          return EXIT_FAILURE;
+        }
         fwrite(write, fmatStrSize, 1, fout);
         fputc('\n', fout);
         fwrite(write, fmatStrSize, 1, stdout);
@@ -121,11 +137,11 @@ int main(int argc, char *argv[]) {
     }
   }
   if (is_list) { // handling last line of file list
-    fputs("</ul>", fout);
+    fputs("</ul>\n", fout);
     is_list = false;
   }
   if (is_ordList) {
-    fputs("</ol>", fout);
+    fputs("</ol>\n", fout);
     is_ordList = false;
   }
   write_html_footer(fout);
