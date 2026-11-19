@@ -53,7 +53,6 @@ int md_heading_to_html(char *str, int heading_no, char *out_buf,
 }
 int md_to_inline(const char *str, char *out_buf, size_t size_outbuf,
                  size_t *ret_outsize) {
-  InlineState curr_state = STATE_NONE;
   char *pOut = out_buf;
   const char *p = str;
 
@@ -63,7 +62,6 @@ int md_to_inline(const char *str, char *out_buf, size_t size_outbuf,
       char *end = strstr(start, "***");
 
       if (end != NULL && *start != ' ' && *(end - 1) != ' ') {
-        curr_state = STATE_BOLD_ITALIC;
         size_t space_used = pOut - out_buf;
         size_t remain = size_outbuf - space_used;
 
@@ -79,7 +77,6 @@ int md_to_inline(const char *str, char *out_buf, size_t size_outbuf,
           memcpy(pOut, "</em></b>", strlen("</em></b>"));
           pOut += 9;
 
-          curr_state = STATE_NONE;
           p = end + 3;
           continue;
         } else {
@@ -93,7 +90,6 @@ int md_to_inline(const char *str, char *out_buf, size_t size_outbuf,
       char *end = strstr(start, "**");
 
       if (end != NULL && *start != ' ' && *(end - 1) != ' ') {
-        curr_state = STATE_BOLD;
         size_t space_used = pOut - out_buf;
         size_t remain = size_outbuf - space_used;
 
@@ -108,7 +104,6 @@ int md_to_inline(const char *str, char *out_buf, size_t size_outbuf,
           memcpy(pOut, "</b>", 4);
           pOut += 4;
 
-          curr_state = STATE_NONE;
           p = end + 2;
           continue;
         } else {
@@ -122,7 +117,6 @@ int md_to_inline(const char *str, char *out_buf, size_t size_outbuf,
       char *end = strstr(start, "*");
 
       if (end != NULL && *start != ' ' && *(end - 1) != ' ') {
-        curr_state = STATE_ITALIC;
         size_t space_used = pOut - out_buf;
         size_t remain = size_outbuf - space_used;
 
@@ -137,7 +131,6 @@ int md_to_inline(const char *str, char *out_buf, size_t size_outbuf,
           memcpy(pOut, "</em>", 5);
           pOut += 5;
 
-          curr_state = STATE_NONE;
           p = end + 1;
           continue;
         }
@@ -151,7 +144,6 @@ int md_to_inline(const char *str, char *out_buf, size_t size_outbuf,
       char *end = strstr(start, "`");
 
       if (end != NULL && *start != ' ' && *(end - 1) != ' ') {
-        curr_state = STATE_CODE;
         size_t space_used = pOut - out_buf;
         size_t remain = size_outbuf - space_used;
 
@@ -167,7 +159,6 @@ int md_to_inline(const char *str, char *out_buf, size_t size_outbuf,
           memcpy(pOut, "</code>", 7);
           pOut += 7;
 
-          curr_state = STATE_NONE;
           p = end + 1;
           continue;
         } else {

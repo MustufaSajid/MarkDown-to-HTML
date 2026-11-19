@@ -16,9 +16,13 @@
  *  Inline Parsing : Bold,Italic,Code,Block and Italic
  *  Ouput : Embed default hardcoded CSS
  *
- *  License: MIT (see license for full text )
+ *  License: MIT (see License for full detail)
  */
 #include "func.h"
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdio.h>
+#include <string.h>
 int main(int argc, char *argv[]) {
   if (argc < 3) {
     fprintf(stderr, "mdtohtml <filename> <out_html filename> <title> <-css>\n");
@@ -50,18 +54,21 @@ int main(int argc, char *argv[]) {
   char *pCurr = NULL;
   bool is_list = false;
   bool is_ordList = false;
+  bool FencedBlock = false;
 
   while (fgets(buffer, sizeof(buffer), file) != NULL) {
-    bool state_para = false;
     bool state_heading = false;
-    bool is_bold = false;
     int hash_count = 0;
     size_t fmatStrSize = 0;
     int pos = strcspn(buffer, "\r\n");
     buffer[pos] = '\0';
-    if (strlen(buffer) == 0) {
+    if (strlen(buffer) == 0 && FencedBlock) {
+      fputc('\n', fout);
+      continue;
+    } else if (strlen(buffer) == 0) {
       continue;
     }
+
     pCurr = buffer;
     while (*pCurr == '#') {
       state_heading = true;
@@ -70,6 +77,53 @@ int main(int argc, char *argv[]) {
     }
     if (state_heading && *pCurr == ' ') {
       pCurr++;
+    }
+    if (state_heading && !FencedBlock) {
+      if (is_list) {
+        fputs("</ul>\n", fout);
+        is_list = false;
+      }
+      if (is_ordList) {
+        fputs("</ol>\n", fout);
+        is_ordList = false;
+      }
+      if (md_heading_to_html(pCurr, hash_count, write, sizeof(write),
+                             &fmatStrSize) != 0) {
+        fclose(file);
+        fclose(fout);
+        return EXIT_FAILURE;
+      }
+      fwrite(write, fmatStrSize, 1, fout);
+      fputc('\n', fout);
+      fwrite(write, fmatStrSize, 1, stdout);
+      continue;
+    }
+    if (FencedBlock) {
+      if (strncmp(pCurr, "```", 3) == 0) {
+        int written = snprintf(write, sizeof(write), "</code></pre>");
+        fwrite(write, 1, written, fout);
+        FencedBlock = false;
+        continue;
+      }
+      // Write the current code line
+      for (const char *p = buffer; *p != '\0'; p++) {
+        switch (*p) {
+        case '&':
+          fputs("&amp;", fout);
+          break;
+        case '<':
+          fputs("&lt;", fout);
+          break;
+        case '>':
+          fputs("&gt;", fout);
+          break;
+        default:
+          fputc(*p, fout);
+          break;
+        }
+      }
+      fputc('\n', fout);
+      continue;
     }
     if (*pCurr == '-' && *(pCurr + 1) == ' ') {
       pCurr += 2;
@@ -85,25 +139,66 @@ int main(int argc, char *argv[]) {
       }
       fwrite(write, fmatStrSize, 1, fout);
       fwrite(write, fmatStrSize, 1, stdout);
-    } else if (isdigit(*pCurr) && *(pCurr + 1) == ' ') {
+    } else if (isdigit(*pCurr) && *(pCurr + 1) == '.' && *(pCurr + 2) == ' ') {
       char *q = pCurr;
-      while (isdigit((unsigned char)*q))
+      while (isdigit((unsigned char)*q)) {
         q++;
+      }
       if (*q == '.' && *(q + 1) == ' ') {
         pCurr = q + 2;
+        if (is_list) {
+          fputs("</ul>\n", fout);
+          is_list = false;
+        }
+        if (md_to_ordered_list(pCurr, write, sizeof(write), &fmatStrSize,
+                               &is_ordList) != 0) {
+          fclose(file);
+          fclose(fout);
+          return EXIT_FAILURE;
+        }
+        fwrite(write, fmatStrSize, 1, fout);
+        fwrite(write, fmatStrSize, 1, stdout);
       }
-      if (is_list) {
-        fputs("</ul>\n", fout);
-        is_list = false;
+    } else if (strncmp(pCurr, "```", 3) == 0) {
+      pCurr += 3;
+      FencedBlock = true;
+      // fprintf(stdout, "FENCED BLOCK DETECTED\n");
+      char langType[26] = {0};
+      char *space = pCurr;
+      while (*space != ' ' && *space != '\0') {
+        // printf("Current char: %c | ASCII: %d\n", *space, *space);
+        space++;
       }
-      if (md_to_ordered_list(pCurr, write, sizeof(write), &fmatStrSize,
-                             &is_ordList) != 0) {
-        fclose(file);
-        fclose(fout);
-        return EXIT_FAILURE;
+      strncpy(langType, pCurr, (space - pCurr));
+      if (*space == ' ') {
+        pCurr = space + 1;
+      } else {
+        pCurr = space;
       }
-      fwrite(write, fmatStrSize, 1, fout);
-      fwrite(write, fmatStrSize, 1, stdout);
+      char *end = pCurr;
+      while (*end != '\0' && strncmp(end, "```", 3) != 0) {
+        end++;
+      }
+      if (strncmp(end, "```", 3) == 0) {
+        char code[1024];
+        strncpy(code, pCurr, (end - pCurr));
+        code[end - pCurr] = '\0';
+        printf("%s\n", code);
+        int written =
+            snprintf(write, sizeof(write),
+                     "<pre><code class=\"language-%s\"> %s </code></pre>",
+                     langType, code);
+        fwrite(write, written, 1, fout);
+        FencedBlock = false;
+        continue;
+      } else {
+        int written = snprintf(write, sizeof(write),
+                               "<pre><code class=\"language-%s\">", langType);
+
+        fwrite(write, 1, written, fout);
+
+        continue;
+      }
     } else {
       if (is_list) {
         fputs("</ul>\n", fout);
@@ -113,19 +208,10 @@ int main(int argc, char *argv[]) {
         fputs("</ol>\n", fout);
         is_ordList = false;
       }
-      if (*pCurr == '\0') { // ignore empty
-        continue;
-      }
-      if (state_heading) {
-        if (md_heading_to_html(pCurr, hash_count, write, sizeof(write),
-                               &fmatStrSize) != 0) {
-          fclose(file);
-          fclose(fout);
-          return EXIT_FAILURE;
-        }
-        fwrite(write, fmatStrSize, 1, fout);
+      if (*pCurr == '\0' && FencedBlock) { // print newline in fenced bloc
         fputc('\n', fout);
-        fwrite(write, fmatStrSize, 1, stdout);
+        continue;
+      } else if (*pCurr == '\0') { // else skip empty
         continue;
       } else {
         md_to_para(pCurr, write, sizeof(write), &fmatStrSize);
@@ -144,9 +230,17 @@ int main(int argc, char *argv[]) {
     fputs("</ol>\n", fout);
     is_ordList = false;
   }
-  write_html_footer(fout);
-  fclose(file);
-  fclose(fout);
+  if (FencedBlock) {
+    {
+      int written = snprintf(write, sizeof(write), "</code></pre>");
+      fwrite(write, 1, written, fout);
+      FencedBlock = false;
+    }
 
-  return EXIT_SUCCESS;
+    write_html_footer(fout);
+    fclose(file);
+    fclose(fout);
+
+    return EXIT_SUCCESS;
+  }
 }
